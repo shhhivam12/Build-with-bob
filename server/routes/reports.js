@@ -25,7 +25,7 @@ function writeReports(reports) {
 // POST /api/reports
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { violationType, latitude, longitude, timestamp } = req.body
+    const { violationType, latitude, longitude, timestamp, description } = req.body
 
     let imageData = null
     let exif = null
@@ -42,6 +42,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     const report = {
       id: uuidv4(),
       violationType,
+      description: description ? description.trim() : '',
       latitude: latitude ? parseFloat(latitude) : null,
       longitude: longitude ? parseFloat(longitude) : null,
       timestamp: timestamp || new Date().toISOString(),
@@ -75,6 +76,24 @@ router.get('/', (_req, res) => {
   } catch (err) {
     console.error('GET /api/reports error:', err)
     res.status(500).json({ error: 'Failed to read reports' })
+  }
+})
+
+// DELETE /api/reports/:id
+router.delete('/:id', (req, res) => {
+  try {
+    const reports = readReports()
+    const idx = reports.findIndex((r) => r.id === req.params.id)
+    if (idx === -1) return res.status(404).json({ error: 'Report not found' })
+    const [deleted] = reports.splice(idx, 1)
+    writeReports(reports)
+    if (req.broadcast) {
+      req.broadcast({ type: 'delete_report', id: deleted.id })
+    }
+    res.json({ deleted: deleted.id })
+  } catch (err) {
+    console.error('DELETE /api/reports/:id error:', err)
+    res.status(500).json({ error: 'Failed to delete report' })
   }
 })
 

@@ -201,6 +201,35 @@
   font-size: 0.9rem;
 }
 
+.textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #1f2328;
+  background: #fff;
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: #3b82d4;
+}
+
+.charCount {
+  font-size: 0.75rem;
+  color: #57606a;
+  text-align: right;
+}
+
+.optional {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #57606a;
+}
+
 @media (max-width: 480px) {
   .row {
     grid-template-columns: 1fr;

@@ -14,6 +14,7 @@ const VIOLATION_TYPES = [
 
 export default function ReportPage() {
   const [violationType, setViolationType] = useState(VIOLATION_TYPES[0])
+  const [description, setDescription] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
   const [geoError, setGeoError] = useState('')
@@ -114,6 +115,7 @@ export default function ReportPage() {
     setStatus(null)
     const formData = new FormData()
     formData.append('violationType', violationType)
+    formData.append('description', description)
     formData.append('latitude', latitude)
     formData.append('longitude', longitude)
     formData.append('timestamp', new Date(timestamp).toISOString())
@@ -126,6 +128,7 @@ export default function ReportPage() {
       setImageBlob(null)
       setPreviewUrl(null)
       setViolationType(VIOLATION_TYPES[0])
+      setDescription('')
       const now = new Date()
       setTimestamp(formatDateTimeLocal(now))
     } catch {
@@ -205,6 +208,20 @@ export default function ReportPage() {
               <option key={v} value={v}>{v}</option>
             ))}
           </select>
+        </section>
+
+        {/* Description */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Additional Notes <span className={styles.optional}>(optional)</span></h2>
+          <textarea
+            className={styles.textarea}
+            rows={3}
+            maxLength={500}
+            placeholder="Describe what you observed…"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <span className={styles.charCount}>{description.length}/500</span>
         </section>
 
         {/* Location */}
