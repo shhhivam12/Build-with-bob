@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Traffic Violation Reporter — Implementation Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --color-primary:       #1E293B;
+    --color-secondary:     #334155;
+    --color-accent:        #22C55E;
+    --color-bg:            #0F172A;
+    --color-fg:            #F8FAFC;
+    --color-card:          #1B2336;
+    --color-muted:         #272F42;
+    --color-muted-fg:      #94A3B8;
+    --color-border:        #475569;
+    --color-destructive:   #EF4444;
+    --color-warning:       #F59E0B;
+    --color-info:          #38BDF8;
+    --radius:              12px;
+    --radius-sm:           8px;
+    --font-display:        'Cinzel', serif;
+    --font-body:           'Josefin Sans', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── BACKGROUND ── */
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(34,197,94,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,197,94,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+  .bg-glow {
+    position: fixed; z-index: 0; pointer-events: none;
+    border-radius: 50%; filter: blur(120px); opacity: 0.18;
+  }
+  .bg-glow-1 { width: 600px; height: 600px; top: -150px; left: -150px; background: #22C55E; }
+  .bg-glow-2 { width: 500px; height: 500px; bottom: 10%; right: -100px; background: #38BDF8; }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── HEADER / HERO ── */
+  header {
+    padding: 72px 0 56px;
+    text-align: center;
+    position: relative; z-index: 1;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--color-accent);
+    margin-bottom: 28px;
+  }
+  .hero-badge .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.7); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot { animation: none; }
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.15;
+    margin-bottom: 20px;
+  }
+  h1 span { color: var(--color-accent); }
+  .hero-sub {
+    font-size: 1.05rem; color: var(--color-muted-fg); font-weight: 400;
+    max-width: 600px; margin: 0 auto 36px;
+  }
+  .hero-stack {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+    margin-bottom: 0;
+  }
+  .chip {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 500; letter-spacing: 0.06em;
+    border: 1px solid var(--color-border);
+    background: rgba(255,255,255,0.04);
+    color: var(--color-muted-fg);
+    transition: border-color 150ms, color 150ms;
+  }
+  .chip:hover { border-color: var(--color-accent); color: var(--color-fg); }
+
+  /* ── METRICS ROW ── */
+  .metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px; margin: 56px 0;
+  }
+  .metric-card {
+    background: rgba(27,35,54,0.7);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .metric-num {
+    font-family: var(--font-display);
+    font-size: 2rem; font-weight: 700; color: var(--color-accent);
+    line-height: 1;
+  }
+  .metric-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-muted-fg); margin-top: 8px; }
+
+  /* ── SECTION TITLE ── */
+  .section-header { text-align: center; margin-bottom: 40px; }
+  .section-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--color-accent); margin-bottom: 12px;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 600; letter-spacing: 0.03em;
+  }
+  .section-desc { color: var(--color-muted-fg); font-size: 0.95rem; margin-top: 10px; }
+
+  /* ── ARCHITECTURE ── */
+  .arch-box {
+    background: rgba(27,35,54,0.7);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 64px;
+  }
+  .arch-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-top: 24px;
+  }
+  @media (max-width: 640px) { .arch-grid { grid-template-columns: 1fr; } }
+  .arch-side {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+  }
+  .arch-side-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--color-info); margin-bottom: 14px;
+  }
+  .arch-file {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+  }
+  .arch-file:last-child { border-bottom: none; }
+  .arch-file .icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .arch-file .path { color: var(--color-fg); font-weight: 500; }
+  .arch-file .desc { color: var(--color-muted-fg); font-size: 11.5px; margin-top: 2px; }
+  .arrow-row {
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+    padding: 16px 0; color: var(--color-muted-fg); font-size: 13px; font-weight: 500;
+  }
+  .arrow-line {
+    flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--color-border), transparent);
+  }
+
+  /* ── TASK CARDS ── */
+  .tasks-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px; margin-bottom: 64px;
+  }
+  .task-card {
+    background: rgba(27,35,54,0.7);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 28px;
+    display: flex; flex-direction: column; gap: 18px;
+    transition: border-color 200ms, transform 200ms, box-shadow 200ms;
+    cursor: default;
+  }
+  .task-card:hover {
+    border-color: rgba(34,197,94,0.35);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  }
+  .task-header { display: flex; align-items: center; gap: 14px; }
+  .task-num {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 14px; font-weight: 700;
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25);
+    color: var(--color-accent);
+  }
+  .task-title { font-weight: 600; font-size: 1rem; }
+  .task-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+    color: var(--color-warning);
+    width: fit-content;
+  }
+  .task-status .sdot {
+    width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+  }
+  .task-intent { color: var(--color-muted-fg); font-size: 0.88rem; line-height: 1.6; }
+  .task-outcomes { margin-top: 4px; }
+  .task-outcomes-title {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 700; color: var(--color-info); margin-bottom: 10px;
+  }
+  .outcome-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.04);
+    font-size: 12.5px; color: var(--color-fg);
+  }
+  .outcome-item:first-of-type { border-top: none; }
+  .check-icon {
+    width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;
+    background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .check-icon svg { width: 9px; height: 9px; stroke: var(--color-accent); fill: none; stroke-width: 2.5; }
+  .task-todos { margin-top: 4px; }
+  .task-todos-title {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 700; color: var(--color-muted-fg); margin-bottom: 10px;
+  }
+  .todo-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; color: var(--color-muted-fg); padding: 4px 0;
+  }
+  .todo-num {
+    min-width: 18px; height: 18px; border-radius: 4px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    font-size: 10px; display: flex; align-items: center; justify-content: center;
+    color: var(--color-muted-fg); flex-shrink: 0; margin-top: 1px;
+  }
+  .task-card.featured { border-color: rgba(34,197,94,0.25); }
+  .task-card.featured .task-num { background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.4); }
+
+  /* ── VIOLATION TYPES ── */
+  .violations-section { margin-bottom: 64px; }
+  .violations-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;
+  }
+  .violation-pill {
+    background: rgba(27,35,54,0.7);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 13px; font-weight: 500;
+    transition: border-color 150ms;
+  }
+  .violation-pill:hover { border-color: rgba(239,68,68,0.4); }
+  .violation-icon {
+    width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+
+  /* ── TECH STACK ── */
+  .stack-section { margin-bottom: 64px; }
+  .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .stack-card {
+    background: rgba(27,35,54,0.7);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 22px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .stack-label {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 700; color: var(--color-muted-fg);
+  }
+  .stack-name { font-weight: 700; font-size: 1.05rem; }
+  .stack-role { font-size: 12px; color: var(--color-muted-fg); }
+  .stack-dot { width: 8px; height: 8px; border-radius: 50%; margin-bottom: 4px; }
+  .dot-green  { background: #22C55E; box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+  .dot-blue   { background: #38BDF8; box-shadow: 0 0 8px rgba(56,189,248,0.6); }
+  .dot-purple { background: #A78BFA; box-shadow: 0 0 8px rgba(167,139,250,0.6); }
+  .dot-orange { background: #FB923C; box-shadow: 0 0 8px rgba(251,146,60,0.6); }
+
+  /* ── PRIVACY SECTION ── */
+  .privacy-box {
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: var(--radius);
+    padding: 32px; margin-bottom: 64px;
+    display: flex; gap: 24px; align-items: flex-start;
+  }
+  @media (max-width: 600px) { .privacy-box { flex-direction: column; } }
+  .privacy-icon-wrap {
+    width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .privacy-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; color: #FCA5A5; }
+  .privacy-items { display: flex; flex-direction: column; gap: 6px; }
+  .privacy-item { font-size: 13px; color: var(--color-fg); display: flex; gap: 8px; align-items: center; }
+  .privacy-item::before { content: '—'; color: var(--color-destructive); font-weight: 700; }
+
+  /* ── PROGRESS TRACKER ── */
+  .progress-section { margin-bottom: 64px; }
+  .progress-track {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; padding-bottom: 8px;
+  }
+  .prog-step {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    min-width: 110px; flex: 1;
+  }
+  .prog-circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid var(--color-border);
+    background: var(--color-muted);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 14px; font-weight: 700;
+    color: var(--color-muted-fg);
+    position: relative; z-index: 1;
+  }
+  .prog-circle.pending {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+  }
+  .prog-label { font-size: 11px; color: var(--color-muted-fg); text-align: center; font-weight: 500; }
+  .prog-connector {
+    flex: 1; height: 2px; background: rgba(255,255,255,0.08); margin: 0 -4px; margin-bottom: 28px;
+    min-width: 20px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding: 32px 0;
+    text-align: center;
+    color: var(--color-muted-fg);
+    font-size: 12px;
+    position: relative; z-index: 1;
+  }
+  footer strong { color: var(--color-fg); font-weight: 600; }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); margin: 0 0 64px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--color-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    header { padding: 48px 0 40px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .tasks-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow bg-glow-1" aria-hidden="true"></div>
+<div class="bg-glow bg-glow-2" aria-hidden="true"></div>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="container">
+    <div class="hero-badge">
+      <span class="dot" aria-hidden="true"></span>
+      Implementation Plan · Build with Bob
+    </div>
+    <h1>Traffic Violation<br/><span>Reporter</span></h1>
+    <p class="hero-sub">
+      A fully anonymous civic web app — citizens report violations in real time,
+      authorities monitor live on an interactive map.
+    </p>
+    <div class="hero-stack" role="list" aria-label="Technology stack">
+      <span class="chip" role="listitem">React + Vite</span>
+      <span class="chip" role="listitem">Node.js + Express</span>
+      <span class="chip" role="listitem">WebSocket (ws)</span>
+      <span class="chip" role="listitem">Leaflet.js</span>
+      <span class="chip" role="listitem">Flat JSON store</span>
+      <span class="chip" role="listitem">Zero Login</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ METRICS ═══ -->
+<div class="container">
+  <div class="metrics" role="list" aria-label="Project metrics">
+    <div class="metric-card" role="listitem">
+      <div class="metric-num">5</div>
+      <div class="metric-label">Sub-Tasks</div>
+    </div>
+    <div class="metric-card" role="listitem">
+      <div class="metric-num">8</div>
+      <div class="metric-label">Violation Types</div>
+    </div>
+    <div class="metric-card" role="listitem">
+      <div class="metric-num">2</div>
+      <div class="metric-label">App Pages</div>
+    </div>
+    <div class="metric-card" role="listitem">
+      <div class="metric-num" style="color:var(--color-info);">RT</div>
+      <div class="metric-label">Live WebSocket</div>
+    </div>
+    <div class="metric-card" role="listitem">
+      <div class="metric-num" style="color:var(--color-destructive);">0</div>
+      <div class="metric-label">Identity Stored</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<div class="container">
+  <div class="section-header">
+    <div class="section-tag">System Design</div>
+    <h2>Architecture Overview</h2>
+    <p class="section-desc">Monorepo with separate client and server packages, communicating via REST + WebSocket.</p>
+  </div>
+
+  <div class="arch-box">
+    <div class="arch-grid">
+      <!-- Client -->
+      <div class="arch-side">
+        <div class="arch-side-title">📦 client/ — React + Vite (port 5173)</div>
+        <div class="arch-file">
+          <span class="icon">📄</span>
+          <div><div class="path">src/main.jsx</div><div class="desc">App entry point</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">📄</span>
+          <div><div class="path">src/App.jsx</div><div class="desc">React Router setup</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">📄</span>
+          <div><div class="path">src/leaflet-setup.js</div><div class="desc">Leaflet icon fix for Vite</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">🗂</span>
+          <div><div class="path">src/pages/ReportPage.jsx</div><div class="desc">Citizen report form — route: /</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">🗂</span>
+          <div><div class="path">src/pages/DashboardPage.jsx</div><div class="desc">Authority live map — route: /dashboard</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">⚙️</span>
+          <div><div class="path">vite.config.js</div><div class="desc">Proxy /api + /ws → :3001</div></div>
+        </div>
+      </div>
+
+      <!-- Server -->
+      <div class="arch-side">
+        <div class="arch-side-title">🖥 server/ — Node.js + Express (port 3001)</div>
+        <div class="arch-file">
+          <span class="icon">📄</span>
+          <div><div class="path">index.js</div><div class="desc">Express + HTTP + WebSocket server</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">🗂</span>
+          <div><div class="path">routes/reports.js</div><div class="desc">POST + GET handlers, broadcast()</div></div>
+        </div>
+        <div class="arch-file">
+          <span class="icon">💾</span>
+          <div><div class="path">data/reports.json</div><div class="desc">Flat file store — [ ] initially empty</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-row" aria-hidden="true">
+      <div class="arrow-line"></div>
+      <span>REST API &nbsp;/api/reports&nbsp; + &nbsp;WebSocket /ws</span>
+      <div class="arrow-line"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:8px;padding:14px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent);margin-bottom:8px;">Data Flow — Report Submit</div>
+        <div style="font-size:12.5px;color:var(--color-muted-fg);line-height:1.8;">
+          Camera / Upload → FormData POST<br/>
+          → multer parse → exifr → uuid<br/>
+          → write reports.json<br/>
+          → WebSocket broadcast → Dashboard
+        </div>
+      </div>
+      <div style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15);border-radius:8px;padding:14px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--color-info);margin-bottom:8px;">Data Flow — Dashboard Load</div>
+        <div style="font-size:12.5px;color:var(--color-muted-fg);line-height:1.8;">
+          GET /api/reports → render markers<br/>
+          → Leaflet map + sidebar list<br/>
+          → WebSocket onmessage<br/>
+          → prepend new report to state
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PROGRESS TRACKER ═══ -->
+<div class="container">
+  <div class="section-header">
+    <div class="section-tag">Status</div>
+    <h2>Implementation Progress</h2>
+  </div>
+  <div class="progress-section">
+    <div class="progress-track" role="list" aria-label="Task progress">
+      <div class="prog-step" role="listitem">
+        <div class="prog-circle pending" aria-label="Pending">1</div>
+        <div class="prog-label">Scaffolding</div>
+      </div>
+      <div class="prog-connector" aria-hidden="true"></div>
+      <div class="prog-step" role="listitem">
+        <div class="prog-circle pending" aria-label="Pending">2</div>
+        <div class="prog-label">Backend API</div>
+      </div>
+      <div class="prog-connector" aria-hidden="true"></div>
+      <div class="prog-step" role="listitem">
+        <div class="prog-circle pending" aria-label="Pending">3</div>
+        <div class="prog-label">Report Form</div>
+      </div>
+      <div class="prog-connector" aria-hidden="true"></div>
+      <div class="prog-step" role="listitem">
+        <div class="prog-circle pending" aria-label="Pending">4</div>
+        <div class="prog-label">Dashboard</div>
+      </div>
+      <div class="prog-connector" aria-hidden="true"></div>
+      <div class="prog-step" role="listitem">
+        <div class="prog-circle pending" aria-label="Pending">5</div>
+        <div class="prog-label">E2E Validation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container"><div class="divider"></div></div>
+
+<!-- ═══ TASK CARDS ═══ -->
+<div class="container">
+  <div class="section-header">
+    <div class="section-tag">Implementation</div>
+    <h2>Sub-Tasks</h2>
+    <p class="section-desc">5 sequential tasks — each must complete before the next begins.</p>
+  </div>
+
+  <div class="tasks-grid">
+
+    <!-- Task 1 -->
+    <article class="task-card featured" aria-labelledby="t1-title">
+      <div class="task-header">
+        <div class="task-num" aria-hidden="true">01</div>
+        <div id="t1-title" class="task-title">Project Scaffolding</div>
+      </div>
+      <div class="task-status"><span class="sdot" aria-hidden="true"></span>Pending</div>
+      <p class="task-intent">Set up the monorepo with separate <code>client</code> (React/Vite) and <code>server</code> (Node/Express) packages. Both start together with one command from root.</p>
+      <div class="task-outcomes">
+        <div class="task-outcomes-title">Expected Outcomes</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Root package.json with workspaces + concurrently dev script</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>client/ scaffolded with Vite + React template</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>server/ with Express health check on GET /api/health</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Vite proxy forwards /api and WS to localhost:3001</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>npm run dev from root starts both client + server</div>
+      </div>
+      <div class="task-todos">
+        <div class="task-todos-title">Todo List (7 items)</div>
+        <div class="todo-item"><span class="todo-num">1</span>Create root package.json with workspaces &amp; concurrently</div>
+        <div class="todo-item"><span class="todo-num">2</span>Scaffold client/ using npm create vite@latest (React)</div>
+        <div class="todo-item"><span class="todo-num">3</span>Configure vite.config.js proxy for /api + WS</div>
+        <div class="todo-item"><span class="todo-num">4</span>Create server/package.json, install express/cors/ws/uuid/exifr/multer</div>
+        <div class="todo-item"><span class="todo-num">5</span>Create server/index.js with health route on port 3001</div>
+        <div class="todo-item"><span class="todo-num">6</span>Create server/data/reports.json as empty array []</div>
+        <div class="todo-item"><span class="todo-num">7</span>Verify npm run dev starts both services</div>
+      </div>
+    </article>
+
+    <!-- Task 2 -->
+    <article class="task-card" aria-labelledby="t2-title">
+      <div class="task-header">
+        <div class="task-num" aria-hidden="true">02</div>
+        <div id="t2-title" class="task-title">Backend: Report Storage & API</div>
+      </div>
+      <div class="task-status"><span class="sdot" aria-hidden="true"></span>Pending</div>
+      <p class="task-intent">Implement the server-side REST API for submitting and retrieving violation reports. Persist to reports.json. Zero IP or identity logging.</p>
+      <div class="task-outcomes">
+        <div class="task-outcomes-title">Expected Outcomes</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>POST /api/reports accepts multipart form + image</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>GET /api/reports returns all reports sorted newest-first</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Record: id/violationType/lat/lng/timestamp/imageData/exif</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>IP address explicitly NOT stored</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>WebSocket broadcast to all clients on each POST</div>
+      </div>
+      <div class="task-todos">
+        <div class="task-todos-title">Todo List (6 items)</div>
+        <div class="todo-item"><span class="todo-num">1</span>Create server/routes/reports.js with Express Router</div>
+        <div class="todo-item"><span class="todo-num">2</span>POST: multer memory → exifr.parse → uuid → write JSON → broadcast</div>
+        <div class="todo-item"><span class="todo-num">3</span>GET: read reports.json, return sorted array</div>
+        <div class="todo-item"><span class="todo-num">4</span>Mount router in index.js under /api/reports</div>
+        <div class="todo-item"><span class="todo-num">5</span>Set up ws WebSocket server attached to HTTP server + broadcast()</div>
+        <div class="todo-item"><span class="todo-num">6</span>Add CORS middleware for Vite dev origin</div>
+      </div>
+    </article>
+
+    <!-- Task 3 -->
+    <article class="task-card" aria-labelledby="t3-title">
+      <div class="task-header">
+        <div class="task-num" aria-hidden="true">03</div>
+        <div id="t3-title" class="task-title">Frontend: Report Submission Form</div>
+      </div>
+      <div class="task-status"><span class="sdot" aria-hidden="true"></span>Pending</div>
+      <p class="task-intent">Build the citizen-facing form at /. Camera capture, file upload, GPS auto-fill, violation select, and anonymous POST — fully mobile usable.</p>
+      <div class="task-outcomes">
+        <div class="task-outcomes-title">Expected Outcomes</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>ReportPage.jsx renders at route /</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Camera via getUserMedia + canvas snapshot</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>File upload with preview</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Violation type &lt;select&gt; with 8 fixed options</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>GPS + timestamp auto-filled (read-only)</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>FormData POST with success confirmation + reset</div>
+      </div>
+      <div class="task-todos">
+        <div class="task-todos-title">Todo List (8 items)</div>
+        <div class="todo-item"><span class="todo-num">1</span>Install React Router, set up / and /dashboard routes</div>
+        <div class="todo-item"><span class="todo-num">2</span>Create ReportPage.jsx with form layout</div>
+        <div class="todo-item"><span class="todo-num">3</span>Camera sub-component: getUserMedia → video → canvas snapshot</div>
+        <div class="todo-item"><span class="todo-num">4</span>File upload input with URL.createObjectURL preview</div>
+        <div class="todo-item"><span class="todo-num">5</span>Geolocation auto-fill + denied fallback message</div>
+        <div class="todo-item"><span class="todo-num">6</span>Auto date/time fill on mount (read-only)</div>
+        <div class="todo-item"><span class="todo-num">7</span>handleSubmit: FormData POST, success/error states</div>
+        <div class="todo-item"><span class="todo-num">8</span>Responsive CSS — works on 375px viewport</div>
+      </div>
+    </article>
+
+    <!-- Task 4 -->
+    <article class="task-card" aria-labelledby="t4-title">
+      <div class="task-header">
+        <div class="task-num" aria-hidden="true">04</div>
+        <div id="t4-title" class="task-title">Frontend: Authority Dashboard</div>
+      </div>
+      <div class="task-status"><span class="sdot" aria-hidden="true"></span>Pending</div>
+      <p class="task-intent">Build the authority-facing dashboard at /dashboard. Leaflet map with markers, sidebar report list, live WebSocket updates, pulsing "Live" indicator.</p>
+      <div class="task-outcomes">
+        <div class="task-outcomes-title">Expected Outcomes</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>DashboardPage.jsx at /dashboard</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Initial load from GET /api/reports, renders markers</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>WebSocket onmessage prepends new report to state</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Leaflet markers with popups: type + time + thumbnail</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Sidebar list newest-first + Live indicator pulses</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>No-GPS reports: sidebar only, no marker</div>
+      </div>
+      <div class="task-todos">
+        <div class="task-todos-title">Todo List (9 items)</div>
+        <div class="todo-item"><span class="todo-num">1</span>Install leaflet + react-leaflet in client/</div>
+        <div class="todo-item"><span class="todo-num">2</span>Create DashboardPage.jsx</div>
+        <div class="todo-item"><span class="todo-num">3</span>useEffect: fetch GET /api/reports on mount</div>
+        <div class="todo-item"><span class="todo-num">4</span>useEffect: WebSocket connection + prepend on message</div>
+        <div class="todo-item"><span class="todo-num">5</span>MapContainer + OpenStreetMap tiles + default city center</div>
+        <div class="todo-item"><span class="todo-num">6</span>Marker per report with Popup (type, time, img thumbnail)</div>
+        <div class="todo-item"><span class="todo-num">7</span>Sidebar grid/flex layout with thumbnails</div>
+        <div class="todo-item"><span class="todo-num">8</span>Pulsing "Live" green dot indicator</div>
+        <div class="todo-item"><span class="todo-num">9</span>Leaflet icon fix via leaflet-setup.js</div>
+      </div>
+    </article>
+
+    <!-- Task 5 -->
+    <article class="task-card" aria-labelledby="t5-title">
+      <div class="task-header">
+        <div class="task-num" aria-hidden="true">05</div>
+        <div id="t5-title" class="task-title">Integration & E2E Validation</div>
+      </div>
+      <div class="task-status"><span class="sdot" aria-hidden="true"></span>Pending</div>
+      <p class="task-intent">Wire everything together. Verify full user journey, confirm zero identity/IP leakage, test mobile responsiveness, write README.</p>
+      <div class="task-outcomes">
+        <div class="task-outcomes-title">Expected Outcomes</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Report appears on dashboard within 1–2s via WebSocket</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>reports.json has no IP or identity fields</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Both pages navigable via browser URL</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Works on Chrome mobile emulation (responsive)</div>
+        <div class="outcome-item"><div class="check-icon" aria-hidden="true"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>README.md documents install + run steps</div>
+      </div>
+      <div class="task-todos">
+        <div class="task-todos-title">Todo List (7 items)</div>
+        <div class="todo-item"><span class="todo-num">1</span>Test camera capture → submit → dashboard update</div>
+        <div class="todo-item"><span class="todo-num">2</span>Test file upload flow end-to-end</div>
+        <div class="todo-item"><span class="todo-num">3</span>Inspect reports.json — confirm no IP field</div>
+        <div class="todo-item"><span class="todo-num">4</span>Test geolocation denied — warning + submission works</div>
+        <div class="todo-item"><span class="todo-num">5</span>Test multiple reports — markers + sidebar both update</div>
+        <div class="todo-item"><span class="todo-num">6</span>Verify Leaflet marker icon fix works</div>
+        <div class="todo-item"><span class="todo-num">7</span>Write README.md with prerequisites + install + run steps</div>
+      </div>
+    </article>
+
+  </div>
+</div>
+
+<!-- ═══ VIOLATION TYPES ═══ -->
+<div class="container violations-section">
+  <div class="section-header">
+    <div class="section-tag">Data</div>
+    <h2>Violation Types</h2>
+    <p class="section-desc">8 fixed options in the citizen report form picklist.</p>
+  </div>
+  <div class="violations-grid" role="list" aria-label="Violation types">
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">🚦</div>Red Light Jumping</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">↩️</div>Wrong-Way Driving</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">🪖</div>No Helmet</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">💨</div>Speeding</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">🚫</div>Illegal Parking</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">📱</div>Using Phone While Driving</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">🍺</div>Drunk Driving</div>
+    <div class="violation-pill" role="listitem"><div class="violation-icon" aria-hidden="true">⚖️</div>Overloading</div>
+  </div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<div class="container stack-section">
+  <div class="section-header">
+    <div class="section-tag">Technology</div>
+    <h2>Tech Stack</h2>
+  </div>
+  <div class="stack-grid" role="list" aria-label="Technology stack details">
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-blue"></div>
+      <div class="stack-label">Frontend</div>
+      <div class="stack-name">React + Vite</div>
+      <div class="stack-role">JSX UI, hot reload, proxy config</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-green"></div>
+      <div class="stack-label">Backend</div>
+      <div class="stack-name">Node.js + Express</div>
+      <div class="stack-role">REST API, multipart upload, file I/O</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-purple"></div>
+      <div class="stack-label">Real-time</div>
+      <div class="stack-name">WebSocket (ws)</div>
+      <div class="stack-role">Broadcast new reports to dashboard</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-orange"></div>
+      <div class="stack-label">Map</div>
+      <div class="stack-name">Leaflet.js</div>
+      <div class="stack-role">OpenStreetMap tiles, markers, popups</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-blue"></div>
+      <div class="stack-label">EXIF</div>
+      <div class="stack-name">exifr</div>
+      <div class="stack-role">Extract metadata from uploaded images</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-green"></div>
+      <div class="stack-label">Data Store</div>
+      <div class="stack-name">Flat JSON File</div>
+      <div class="stack-role">reports.json — no database needed</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-purple"></div>
+      <div class="stack-label">Upload</div>
+      <div class="stack-name">multer</div>
+      <div class="stack-role">memoryStorage — no disk writes</div>
+    </div>
+    <div class="stack-card" role="listitem">
+      <div class="stack-dot dot-orange"></div>
+      <div class="stack-label">IDs</div>
+      <div class="stack-name">uuid</div>
+      <div class="stack-role">Unique report identifiers</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PRIVACY ═══ -->
+<div class="container">
+  <div class="privacy-box" role="region" aria-labelledby="privacy-title">
+    <div class="privacy-icon-wrap" aria-hidden="true">🔒</div>
+    <div>
+      <div id="privacy-title" class="privacy-title">Privacy Guarantees</div>
+      <div class="privacy-items">
+        <div class="privacy-item">No login or account required — zero friction for citizens</div>
+        <div class="privacy-item">IP address is explicitly never captured or stored in reports.json</div>
+        <div class="privacy-item">No identity fields (name, email, phone) in the report schema</div>
+        <div class="privacy-item">GPS coordinates are optional — form works if geolocation is denied</div>
+        <div class="privacy-item">Pure data-only submission — EXIF extracted for metadata, not identity</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="container">
+    <strong>Traffic Violation Reporter</strong> &nbsp;·&nbsp; Implementation Plan &nbsp;·&nbsp; Build with Bob &nbsp;·&nbsp; Branch: <strong>akavinash</strong>
+    <br/><br/>
+    Made with IBM Bob
+  </div>
+</footer>
+
+</body>
+</html>
