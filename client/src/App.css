@@ -1,0 +1,33 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  background: #f7f8fa;
+  color: #1f2328;
+  min-height: 100vh;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #1f2328;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.app-nav a {
+  color: #e5e7eb;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.app-nav a:hover {
+  color: #fff;
+}
